@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+
+# Environment files
+.env
+.env.*
+.env1
+
+# IDE / Editor
+.vscode/
+.idea/
+
+# macOS 系統檔
+.DS_Store
+
+# Logs
+*.log
+
+# Byte-compiled / C extensions
+*.so
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# FastAPI / Uvicorn
+*.db
+.env1
+.env1
+__pycache__/
