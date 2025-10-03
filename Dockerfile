@@ -12,8 +12,13 @@ RUN apt-get update && apt-get install -y ffmpeg git build-essential \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+
 # 複製專案所有檔案
 COPY . .
 
-# 預設跑 Gradio，如果 APP_MODE=api 就跑 FastAPI
-CMD ["sh", "-c", "if [ \"$APP_MODE\" = \"api\" ]; then uvicorn app:app --host 0.0.0.0 --port 7860; else python app_gradio.py; fi"]
+# 開放 FastAPI (8000) 和 Gradio (7860) 兩個 port
+EXPOSE 8000
+EXPOSE 7860
+
+# 啟動 FastAPI API 或 Gradio，根據 APP_MODE 環境變數決定
+CMD sh -c 'if [ "$APP_MODE" = "gradio" ]; then python app/app_gradio.py; else uvicorn app.api.app:app --host 0.0.0.0 --port 8000; fi'
