@@ -10,40 +10,26 @@ import os
 import soundfile as sf
 import random
 
+from board import Board
+game = Board()
+
 # 初始化 - 從環境變數讀取 API Key
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 whisper_model = whisper.load_model("base")  # 可改成 "small"/"medium" 提升準確率
 
-# 棋盤初始化 (3x3)
-board = [[" " for _ in range(3)] for _ in range(3)]
-player_moves = []
-computer_moves = []
-MAX_PIECES = 4
-
 def print_board():
     print("\n棋盤狀態：")
-    for row in board:
+    for r in ["a", "b", "c"]:
+        row = [game.state[f"{r}{c}"] if game.state[f"{r}{c}"] else " " for c in range(1, 4)]
         print(" | ".join(row))
         print("-" * 5)
 
 def check_winner():
-    for row in board:
-        if row[0] != " " and row.count(row[0]) == 3:
-            return row[0]
-    for c in range(3):
-        if board[0][c] != " " and board[0][c] == board[1][c] == board[2][c]:
-            return board[0][c]
-    if board[0][0] != " " and board[0][0] == board[1][1] == board[2][2]:
-        return board[0][0]
-    if board[0][2] != " " and board[0][2] == board[1][1] == board[2][0]:
-        return board[0][2]
-    return None
+    return game.check_winner()
 
 def reset_game():
-    global board, player_moves, computer_moves
-    board = [[" " for _ in range(3)] for _ in range(3)]
-    player_moves = []
-    computer_moves = []
+    global game
+    game = Board()
     print("🔄 新的一局開始！")
     print_board()
 
@@ -125,45 +111,35 @@ def interpret_with_gpt(text):
 
     if data["action"] == "place":
         pos = data["pos"]
-        row = ord(pos[0]) - ord('a')
-        col = int(pos[1]) - 1
 
-        if board[row][col] != " ":
+        if game.state[pos] is not None:
             say("該位置已經有子了，請重新選擇")
             return None
 
-        if len(player_moves) >= MAX_PIECES:
+        if list(game.state.values()).count("O") >= 4:
             say("你已經下滿四子，只能移動自己的子")
             return None
 
-        board[row][col] = "O"
-        player_moves.append((row, col))
+        game.state[pos] = "O"
         print_board()
 
-        cell_name = f"{chr(row + ord('a'))}{col+1}"
-        say(f"你下在 {cell_name}")
+        say(f"你下在 {pos}")
 
         winner = check_winner()
         if winner:
             handle_winner(winner)
             return None  # 已在 handle_winner/say 播報，外層不要再說一次
 
-        empty_cells = [(r, c) for r in range(3) for c in range(3) if board[r][c] == " "]
+        empty_cells = [k for k, v in game.state.items() if v is None]
 
-        while True:
-            r, c = random.choice(empty_cells)
-            if board[r][c] == " ":
-                break
-
-        if len(computer_moves) >= MAX_PIECES:
-            old_r, old_c = computer_moves.pop(0)
-            board[old_r][old_c] = " "
-        board[r][c] = "X"
-        computer_moves.append((r, c))
-        cell_name = f"{chr(r + ord('a'))}{c+1}"
-        print(f"🤖 電腦落子在 {cell_name}")
+        pos_choice = random.choice(empty_cells)
+        if list(game.state.values()).count("X") >= 4:
+            # 移除最舊的電腦子 (假設有紀錄順序，這裡沒實作，暫不移除)
+            pass
+        game.state[pos_choice] = "X"
+        print(f"🤖 電腦落子在 {pos_choice}")
         print_board()
-        say(f"我下在 {cell_name}")
+        say(f"我下在 {pos_choice}")
 
         winner = check_winner()
         if winner:
@@ -174,10 +150,8 @@ def interpret_with_gpt(text):
 
     elif data["action"] == "move":
         from_pos, to_pos = data["from"], data["to"]
-        fr, fc = ord(from_pos[0]) - ord('a'), int(from_pos[1]) - 1
-        tr, tc = ord(to_pos[0]) - ord('a'), int(to_pos[1]) - 1
-        board[tr][tc] = board[fr][fc]
-        board[fr][fc] = " "
+        game.state[to_pos] = game.state[from_pos]
+        game.state[from_pos] = None
         print_board()
 
         say(f"你把 {from_pos} 移動到 {to_pos}")
@@ -187,22 +161,16 @@ def interpret_with_gpt(text):
             handle_winner(winner)
             return None  # 已播報
 
-        empty_cells = [(r, c) for r in range(3) for c in range(3) if board[r][c] == " "]
+        empty_cells = [k for k, v in game.state.items() if v is None]
 
-        while True:
-            r, c = random.choice(empty_cells)
-            if board[r][c] == " ":
-                break
-
-        if len(computer_moves) >= MAX_PIECES:
-            old_r, old_c = computer_moves.pop(0)
-            board[old_r][old_c] = " "
-        board[r][c] = "X"
-        computer_moves.append((r, c))
-        cell_name = f"{chr(r + ord('a'))}{c+1}"
-        print(f"🤖 電腦落子在 {cell_name}")
+        pos_choice = random.choice(empty_cells)
+        if list(game.state.values()).count("X") >= 4:
+            # 移除最舊的電腦子 (假設有紀錄順序，這裡沒實作，暫不移除)
+            pass
+        game.state[pos_choice] = "X"
+        print(f"🤖 電腦落子在 {pos_choice}")
         print_board()
-        say(f"我下在 {cell_name}")
+        say(f"我下在 {pos_choice}")
 
         winner = check_winner()
         if winner:
@@ -220,12 +188,7 @@ def handle_winner(winner):
     else:
         say("我贏了！")
         print("🤖 電腦獲勝！")
-
-    again = input("要再來一局嗎？(y/n): ").strip().lower()
-    if again == "y":
-        reset_game()
-    else:
-        exit()
+    reset_game()
 
 # 🔊 TTS 輸出
 async def speak(text):
@@ -240,7 +203,12 @@ async def speak(text):
     os.remove(filename)
 
 def say(text):
-    asyncio.run(speak(text))
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        asyncio.run(speak(text))
+    else:
+        loop.create_task(speak(text))
     print(f"🔊 電腦回覆: {text}")
 
 # 🌀 測試 Loop

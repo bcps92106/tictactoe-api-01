@@ -11,6 +11,7 @@ class Board:
         # 新增 winner 屬性
         self.winner = None
         self.turn = "X"
+        self.game_over = False
 
     def display(self):
         # 顯示棋盤畫面
@@ -19,24 +20,35 @@ class Board:
             print(' | '.join(self.board[i:i+3]))
         print()
 
+    def switch_turn(self):
+        # 切換回合
+        self.turn = "O" if self.turn == "X" else "X"
+
     def place_piece(self, pos, player):
-        # 嘗試放下一枚棋子
         idx = self.pos_to_idx(pos)
         if idx == -1:
             return False, "無效的位置"
         if self.board[idx] == ' ':
-            # 檢查是否已達最大數量
             if len(self.pieces[player]) >= self.max_pieces:
                 return False, "你已經放滿 4 子，請使用 move_piece()"
-            # 放棋子
             self.board[idx] = player
             self.pieces[player].append(idx)
+
+            # 檢查勝負或平手
+            result = self.check_game_over()
+            if result == "Draw":
+                return True, "draw"
+            elif result in ("X", "O"):
+                return True, result
+
             success, state = True, self.get_board_state()
-            # 切換回合
-            if success:
-                self.turn = "O" if player == "X" else "X"
+            if not self.game_over:
+                self.switch_turn()
             return success, state
         else:
+            # === 關鍵修正：如果棋盤已滿且和局，回傳和局而不是「已經有棋子」 ===
+            if self.is_full() and self.check_game_over() == "Draw":
+                return True, "draw"
             return False, "已經有棋子"
 
     def move_piece(self, to_pos, player, from_pos=None):
@@ -64,10 +76,13 @@ class Board:
         self.board[from_idx] = ' '
         self.board[to_idx] = player
         self.pieces[player].append(to_idx)
+
+        # 檢查勝負或平手
+        self.check_game_over()
+
         success, state = True, self.get_board_state()
-        # 切換回合
-        if success:
-            self.turn = "O" if player == "X" else "X"
+        if not self.game_over:
+            self.switch_turn()
         return success, state
 
     def pos_to_idx(self, pos):
@@ -90,10 +105,29 @@ class Board:
         win = any(all(b[i] == player for i in line) for line in lines)
         if win:
             self.winner = player
-        else:
-            if self.winner is None:
-                self.winner = None
         return win
+
+    def check_game_over(self):
+        # 統一檢查勝負或平手，回傳 "X", "O", "Draw" 或 None
+        if self.is_winner("X"):
+            self.game_over = True
+            return "X"
+        if self.is_winner("O"):
+            self.game_over = True
+            return "O"
+        if self.is_full():
+            self.game_over = True
+            return "Draw"
+        self.game_over = False
+        return None
+
+    def reset(self):
+        # 重置棋盤、棋子、勝利者與回合
+        self.board = [' ' for _ in range(9)]
+        self.pieces = {'X': [], 'O': []}
+        self.winner = None
+        self.turn = "X"
+        self.game_over = False
 
     def is_full(self):
         # 判斷棋盤是否滿了
@@ -119,6 +153,10 @@ class Board:
             pos = self.idx_to_pos(idx)
             val = self.board[idx]
             state[pos] = val if val in ['X', 'O'] else None
+        # Add winner, is_over, next_player
+        state["winner"] = self.winner
+        state["is_over"] = self.game_over
+        state["next_player"] = self.turn if not self.game_over else None
         return state
 
     def render(self):
