@@ -20,5 +20,5 @@ COPY . .
 EXPOSE 8000
 EXPOSE 7860
 
-# 啟動 FastAPI API 或 Gradio，根據 APP_MODE 環境變數決定
-CMD sh -c 'if [ "$APP_MODE" = "gradio" ]; then python app/app_gradio.py; else uvicorn app.api.app:app --host 0.0.0.0 --port 8000; fi'
+# 啟動 FastAPI API
+CMD uvicorn app.api.app:app --host 0.0.0.0 --port ${PORT:-8000}

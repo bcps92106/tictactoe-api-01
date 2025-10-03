@@ -1,0 +1,20 @@
+version: "3.9"
+
+services:
+  api:
+    build: .
+    container_name: tictactoe-api
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_MODE=api
+
+  gradio:
+    build: .
+    container_name: tictactoe-gradio
+    ports:
+      - "7860:7860"
+    environment:
+      - APP_MODE=gradio
+    depends_on:
+      - api
